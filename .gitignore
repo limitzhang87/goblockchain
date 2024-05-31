@@ -1,1 +1,3 @@
-tmp/
+tmp/blocks/*
+tmp/wallets/*
+tmp/ref_listref_list.data

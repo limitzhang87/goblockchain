@@ -46,6 +46,7 @@ func (b *Block) FindNonce() int64 {
 	return nonce
 }
 
+// ValidatePoW 验证工作量
 func (b *Block) ValidatePoW() bool {
 	var intHash big.Int
 	var intTarget big.Int

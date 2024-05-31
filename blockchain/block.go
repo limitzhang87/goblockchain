@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"crypto/sha256"
+	"encoding/gob"
 	"github.com/limitzhang87/goblockchain/transaction"
 	"github.com/limitzhang87/goblockchain/utils"
 	"time"
@@ -17,9 +18,11 @@ type Block struct {
 	Transactions []*transaction.Transaction
 }
 
-func GenesisBlock() *Block {
-	tx := transaction.BaseTx([]byte("limitZhang"))
-	return CreateBlock([]byte{}, []*transaction.Transaction{tx})
+func GenesisBlock(address []byte) *Block {
+	tx := transaction.BaseTx(address)
+	genesis := CreateBlock([]byte("limitZhang is awesome!"), []*transaction.Transaction{tx})
+	genesis.SetHash()
+	return genesis
 }
 
 func CreateBlock(prevHash []byte, txs []*transaction.Transaction) *Block {
@@ -56,4 +59,22 @@ func (b *Block) SetHash() {
 	}, []byte{})
 	hash := sha256.Sum256(information)
 	b.Hash = hash[:]
+}
+
+func (b *Block) Serialize() []byte {
+	var buf bytes.Buffer
+	encoder := gob.NewEncoder(&buf)
+	err := encoder.Encode(b)
+	utils.Handle(err)
+	return buf.Bytes()
+}
+
+func DeSerializeBlock(data []byte) *Block {
+	block := new(Block) // new 返回一个对象指针，并将指针指向一块内存
+	// var block *Block 不能使用这种语法，声明一个指针，结果没有给指针分配内存，导致指针指向为空，后面使用时会报错
+	buf := bytes.NewBuffer(data)
+	decoder := gob.NewDecoder(buf)
+	err := decoder.Decode(block)
+	utils.Handle(err)
+	return block
 }

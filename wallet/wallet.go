@@ -39,6 +39,7 @@ func (w *Wallet) Address() []byte {
 	return address
 }
 
+// Save 保存钱包
 func (w *Wallet) Save() {
 	filename := constcoe.Wallets + string(w.Address()) + ".wlt"
 	//var content bytes.Buffer
@@ -61,6 +62,7 @@ func (w *Wallet) Save() {
 	utils.Handle(err)
 }
 
+// LoadWallet 根据地址返回钱包
 func LoadWallet(address string) *Wallet {
 	filename := constcoe.Wallets + address + ".wlt"
 

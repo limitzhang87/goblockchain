@@ -1,22 +1,28 @@
 package transaction
 
-import "bytes"
+import (
+	"bytes"
+	"github.com/limitzhang87/goblockchain/utils"
+)
 
-type TxOutput struct {
-	Value     int
-	ToAddress []byte
-}
-
+// TxInput 交易输入
 type TxInput struct {
-	TxID        []byte
-	OutIdx      int
-	FromAddress []byte
+	TxID   []byte
+	OutIdx int
+	PubKey []byte // 公钥
+	Sig    []byte // 数字签名
 }
 
-func (in *TxInput) FromAddressRight(address []byte) bool {
-	return bytes.Equal(address, in.FromAddress)
+// TxOutput 交易输出
+type TxOutput struct {
+	Value      int
+	PubKeyHash []byte // 公钥hash
 }
 
-func (out *TxOutput) ToAddressRight(address []byte) bool {
-	return bytes.Equal(address, out.ToAddress)
+func (in *TxInput) FromAddressRight(pubKey []byte) bool {
+	return bytes.Equal(in.PubKey, pubKey)
+}
+
+func (out *TxOutput) ToAddressRight(pubKey []byte) bool {
+	return bytes.Equal(out.PubKeyHash, utils.PublicKeyHash(pubKey))
 }

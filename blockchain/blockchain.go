@@ -2,6 +2,7 @@ package blockchain
 
 import (
 	"bytes"
+	"crypto/ecdsa"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -236,6 +237,7 @@ func (bc *BlockChain) FindUnspentTransactions(address []byte) []*transaction.Tra
 	return unSpentTxs
 }
 
+// FindUTXOs 根据公钥查询UTXO
 func (bc *BlockChain) FindUTXOs(address []byte) (int, map[string]int) {
 	unspentOuts := make(map[string]int)
 	unspentTxs := bc.FindUnspentTransactions(address)
@@ -334,12 +336,12 @@ all:
 }
 
 // CreateTransaction 创建交易
-func (bc *BlockChain) CreateTransaction(from, to []byte, amount int) (*transaction.Transaction, error) {
+func (bc *BlockChain) CreateTransaction(fromPubKey, toPubKeyHash []byte, amount int, priKey ecdsa.PrivateKey) (*transaction.Transaction, error) {
 	input := make([]transaction.TxInput, 0)
 	output := make([]transaction.TxOutput, 0)
 
 	// 获取余额
-	value, validOutputs := bc.FindSpendableOutputs(from, amount)
+	value, validOutputs := bc.FindSpendableOutputs(fromPubKey, amount)
 	if value < amount {
 		return nil, errors.New("not enough funds")
 	}
@@ -349,20 +351,21 @@ func (bc *BlockChain) CreateTransaction(from, to []byte, amount int) (*transacti
 		idxByte, err := hex.DecodeString(idx)
 		utils.Handle(err)
 		input = append(input, transaction.TxInput{
-			TxID:        idxByte,
-			OutIdx:      outIdx,
-			FromAddress: from,
+			TxID:   idxByte,
+			OutIdx: outIdx,
+			PubKey: fromPubKey,
+			Sig:    nil, // 等待下面数字签名
 		})
 	}
 
 	output = append(output, transaction.TxOutput{
-		Value:     amount,
-		ToAddress: to,
+		Value:      amount,
+		PubKeyHash: toPubKeyHash,
 	})
 	if value > amount {
 		output = append(output, transaction.TxOutput{
-			Value:     value - amount,
-			ToAddress: from,
+			Value:      value - amount,
+			PubKeyHash: utils.PublicKeyHash(fromPubKey),
 		})
 	}
 
@@ -371,5 +374,28 @@ func (bc *BlockChain) CreateTransaction(from, to []byte, amount int) (*transacti
 		Outputs: output,
 	}
 	tx.SetId()
+	tx.Sign(priKey)
 	return &tx, nil
+}
+
+// PrintTx 打印交易信息
+func PrintTx(txs []*transaction.Transaction) {
+	for i, tx := range txs {
+		fmt.Printf("\tTransaction Index:%d\n", i)
+		fmt.Println("\tTransaction ID: ", hex.EncodeToString(tx.ID))
+		fmt.Println("\tInput:")
+		for _, in := range tx.Inputs {
+			fmt.Printf("\t\tTxID:%s\n", hex.EncodeToString(in.TxID))
+			fmt.Printf("\t\tOutIdx:%d\n", in.OutIdx)
+			fmt.Printf("\t\tPubKey:%x\n", in.PubKey)
+			fmt.Printf("\t\tAddress:%s\n", string(utils.PubHash2Address(utils.PublicKeyHash(in.PubKey))))
+		}
+		fmt.Println("\tOutput:")
+		for _, out := range tx.Outputs {
+			fmt.Printf("\t\tPubKeyHash:%s\n", hex.EncodeToString(out.PubKeyHash))
+			fmt.Printf("\t\tValue:%d\n", out.Value)
+			fmt.Printf("\t\tAddress:%s\n", string(utils.PubHash2Address(out.PubKeyHash)))
+		}
+	}
+	fmt.Println("===========================")
 }

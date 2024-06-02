@@ -6,7 +6,6 @@ import (
 	"errors"
 	"github.com/limitzhang87/goblockchain/constcoe"
 	"github.com/limitzhang87/goblockchain/utils"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -46,10 +45,12 @@ func (r *RefList) Update() {
 	utils.Handle(err)
 }
 
+// BindRef 别名绑定地址
 func (r *RefList) BindRef(address, refName string) {
 	(*r)[address] = refName
 }
 
+// FindRef 通过别名找地址
 func (r *RefList) FindRef(refName string) (string, error) {
 	tmp := ""
 	for k, v := range *r {
@@ -64,11 +65,12 @@ func (r *RefList) FindRef(refName string) (string, error) {
 
 }
 
+// LoadRefList 加载地址与别名
 func LoadRefList() *RefList {
 	filename := constcoe.WalletsRefList + "ref_list.data"
 	var refList RefList
 	if utils.FileExists(filename) {
-		fileContent, err := ioutil.ReadFile(filename)
+		fileContent, err := os.ReadFile(filename)
 		utils.Handle(err)
 		decoder := gob.NewDecoder(bytes.NewBuffer(fileContent))
 		err = decoder.Decode(&refList)

@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bytes"
+	"encoding/hex"
 	"flag"
 	"fmt"
 	"github.com/limitzhang87/goblockchain/blockchain"
@@ -14,16 +15,17 @@ import (
 )
 
 const (
-	FlagCreateBlockchain = "createblockchain"
-	FlagCreateWallet     = "createwallet"
-	FlagWalletInfo       = "walletinfo"
-	FlagWalletsUpdate    = "walletsupdate"
-	FlagWalletsList      = "walletslist"
-	FlagBalance          = "balance"
-	FlagBlockChainInfo   = "blockchaininfo"
-	FlagSend             = "send"
-	FlagSendByRefName    = "sendbyrefname"
-	FlagMine             = "mine"
+	FlagCreateBlockchain  = "createblockchain"
+	FlagCreateWallet      = "createwallet"
+	FlagWalletInfo        = "walletinfo"
+	FlagWalletsUpdate     = "walletsupdate"
+	FlagWalletsList       = "walletslist"
+	FlagWalletBindRefName = "walletbindrefname"
+	FlagBalance           = "balance"
+	FlagBlockChainInfo    = "blockchaininfo"
+	FlagSend              = "send"
+	FlagSendByRefName     = "sendbyrefname"
+	FlagMine              = "mine"
 )
 
 type CommandLine struct {
@@ -41,6 +43,7 @@ func (cli *CommandLine) printUsage() {
 	fmt.Println("walletinfo -refname NAME -address Address           ----> Print the information of a wallet. At least one of the refname and address is required.")
 	fmt.Println("walletsupdate                                       ----> Registrate and update all the wallets (especially when you have added an existed .wlt file).")
 	fmt.Println("walletslist                                         ----> List all the wallets found (make sure you have run walletsupdate first).")
+	fmt.Println("walletbindrefname                                   ----> Bind address to refname.")
 	fmt.Println("createblockchain -refname NAME -address ADDRESS     ----> Creates a blockchain with the owner you input (address or refname).")
 	fmt.Println("balance -refname NAME -address ADDRESS              ----> Back the balance of a wallet using the address (or refname) you input.")
 	fmt.Println("blockchaininfo                                      ----> Prints the blocks in the chain.")
@@ -63,6 +66,7 @@ func (cli *CommandLine) Run() {
 	createBlockchainCmd := flag.NewFlagSet(FlagCreateBlockchain, flag.ExitOnError)
 	createWalletCmd := flag.NewFlagSet(FlagCreateWallet, flag.ExitOnError)
 	walletInfoCmd := flag.NewFlagSet(FlagWalletInfo, flag.ExitOnError)
+	walletBindRefNameCmd := flag.NewFlagSet(FlagWalletBindRefName, flag.ExitOnError)
 	balanceCmd := flag.NewFlagSet(FlagBalance, flag.ExitOnError)
 	//getBlockCmd := flag.NewFlagSet(FlagBlockChainInfo, flag.ExitOnError)
 	sendCmd := flag.NewFlagSet(FlagSend, flag.ExitOnError)
@@ -99,15 +103,30 @@ func (cli *CommandLine) Run() {
 		cli.walletsUpdate()
 	case FlagWalletsList:
 		cli.walletsList()
+	case FlagWalletBindRefName:
+		address := walletBindRefNameCmd.String("address", "", "The address of the wallet")
+		refName := walletBindRefNameCmd.String("refname", "", "The refname of the wallet")
+		err := walletBindRefNameCmd.Parse(os.Args[2:])
+		utils.Handle(err)
+		if len(*refName) == 0 && len(*address) == 0 {
+			fmt.Println("Please enter a valid address or refname")
+			return
+		}
+		cli.walletBindRefName(*address, *refName)
 	case FlagBalance:
+		address := balanceCmd.String("address", "", "The address of the wallet")
 		refName := balanceCmd.String("refname", "", "Who need to get balance amount")
 		err := balanceCmd.Parse(os.Args[2:])
 		utils.Handle(err)
-		if len(*refName) == 0 {
-			fmt.Println("Please enter a valid refName")
+		if len(*refName) == 0 && len(*address) == 0 {
+			fmt.Println("Please enter a valid refName or address")
 			return
 		}
-		cli.balanceRefName(*refName)
+		if len(*refName) != 0 {
+			cli.balanceRefName(*refName)
+		} else {
+			cli.balance(*address)
+		}
 	case FlagBlockChainInfo:
 		cli.getBlockchainInfo()
 	case FlagSend:
@@ -152,7 +171,7 @@ func (cli *CommandLine) Run() {
 
 // createBlockchain 创建区块链
 func (cli *CommandLine) createBlockchain(address string) {
-	newChain := blockchain.InitBlockChain([]byte(address))
+	newChain := blockchain.InitBlockChain(utils.Address2PubHash([]byte(address)))
 	_ = newChain.Database.Close()
 	fmt.Println("Created new blockchain: owner is : ", address)
 }
@@ -163,6 +182,7 @@ func (cli *CommandLine) createBlockchainRefName(refName string) {
 	cli.createBlockchain(address)
 }
 
+// createWallet 创建钱包
 func (cli *CommandLine) createWallet(refName string) {
 	wlt := wallet.NewWallet()
 	wlt.Save()
@@ -200,6 +220,7 @@ func (cli *CommandLine) walletsUpdate() {
 	refList.Save()
 }
 
+// walletsList 钱包列表
 func (cli *CommandLine) walletsList() {
 	refList := wallet.LoadRefList()
 	for address, refName := range *refList {
@@ -213,13 +234,30 @@ func (cli *CommandLine) walletsList() {
 	}
 }
 
-// balance 查询账户余额
+// walletBindRefName 钱包绑定别名
+func (cli *CommandLine) walletBindRefName(address, refName string) {
+	_ = wallet.LoadWallet(address) // 加载钱包，用于判断address是合法的
+
+	refList := wallet.LoadRefList()
+	// 判断refName是否已经存在
+	a, err := refList.FindRef(refName)
+	if err == nil {
+		fmt.Printf("refname had already bind to %s\n", a)
+		return
+	}
+	refList.BindRef(address, refName)
+	refList.Save()
+	fmt.Printf("Bind success")
+}
+
+// balance 查询账户余额 address
 func (cli *CommandLine) balance(address string) {
 	chain := blockchain.ContinueBlockChain()
 	defer func() {
 		_ = chain.Database.Close()
 	}()
-	balance, _ := chain.FindUTXOs([]byte(address))
+	wlt := wallet.LoadWallet(address)
+	balance, _ := chain.FindUTXOs(wlt.PublicKey)
 	fmt.Println("Address is : ", address, "Balance : ", balance)
 }
 
@@ -239,13 +277,29 @@ func (cli *CommandLine) getBlockchainInfo() {
 	ogPrevHash := chain.BackOgPrevHash()
 	for {
 		block := iter.Next()
-		fmt.Println("--------------------------------------------------------------------------------------------------------------")
+		fmt.Println("---------------------------------------------------------------------------------------------")
 		fmt.Printf("Timestamp:%s\n", time.Unix(block.Timestamp, 0).Format(time.DateTime))
 		fmt.Printf("Previous hash:%x\n", block.PrevHash)
 		fmt.Printf("Transactions:%v\n", block.Transactions)
+		for i, tx := range block.Transactions {
+			fmt.Printf("\tTransaction Index:%d\n", i)
+			fmt.Println("\tInput:")
+			for _, in := range tx.Inputs {
+				fmt.Printf("\t\tTxID:%s\n", hex.EncodeToString(in.TxID))
+				fmt.Printf("\t\tOutIdx:%d\n", in.OutIdx)
+				fmt.Printf("\t\tPubKey:%x\n", in.PubKey)
+				fmt.Printf("\t\tAddress:%s\n", string(utils.PubHash2Address(utils.PublicKeyHash(in.PubKey))))
+			}
+			fmt.Println("\tOutput:")
+			for _, out := range tx.Outputs {
+				fmt.Printf("\t\tPubKeyHash:%s\n", hex.EncodeToString(out.PubKeyHash))
+				fmt.Printf("\t\tValue:%d\n", out.Value)
+				fmt.Printf("\t\tAddress:%s\n", string(utils.PubHash2Address(out.PubKeyHash)))
+			}
+		}
 		fmt.Printf("hash:%x\n", block.Hash)
 		fmt.Printf("Pow: %s\n", strconv.FormatBool(block.ValidatePoW()))
-		fmt.Println("--------------------------------------------------------------------------------------------------------------")
+		fmt.Println("---------------------------------------------------------------------------------------------")
 		fmt.Println()
 		if bytes.Equal(ogPrevHash, block.PrevHash) {
 			break
@@ -253,14 +307,16 @@ func (cli *CommandLine) getBlockchainInfo() {
 	}
 }
 
-// send 发送交易
+// send 发送交易 from,to 钱包地址
 func (cli *CommandLine) send(from, to string, amount int) {
 	chain := blockchain.ContinueBlockChain()
 	defer func() {
 		_ = chain.Database.Close()
 	}()
 
-	tx, err := chain.CreateTransaction([]byte(from), []byte(to), amount)
+	fromWallet := wallet.LoadWallet(from)
+
+	tx, err := chain.CreateTransaction(fromWallet.PublicKey, utils.Address2PubHash([]byte(to)), amount, fromWallet.PrivateKey)
 	if err != nil {
 		fmt.Println("Create transaction error : ", err)
 		return
@@ -282,6 +338,14 @@ func (cli *CommandLine) sendByName(nameFrom, toFrom string, amount int) {
 	cli.send(addressFrom, addressTo, amount)
 }
 
+// getAddressByRefName 根据别名查找钱包地址
+func (cli *CommandLine) getAddressByRefName(refName string) string {
+	refList := wallet.LoadRefList()
+	address, err := refList.FindRef(refName)
+	utils.Handle(err)
+	return address
+}
+
 // mine 挖矿
 func (cli *CommandLine) mine() {
 	chain := blockchain.ContinueBlockChain()
@@ -291,11 +355,4 @@ func (cli *CommandLine) mine() {
 
 	chain.RunMine()
 	fmt.Println("Finish Mining")
-}
-
-func (cli *CommandLine) getAddressByRefName(refName string) string {
-	refList := wallet.LoadRefList()
-	address, err := refList.FindRef(refName)
-	utils.Handle(err)
-	return address
 }

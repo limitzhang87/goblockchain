@@ -2,12 +2,16 @@ package utils
 
 import (
 	"bytes"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/binary"
 	"github.com/limitzhang87/goblockchain/constcoe"
 	"github.com/mr-tron/base58"
 	"golang.org/x/crypto/ripemd160"
 	"log"
+	"math/big"
 	"os"
 )
 
@@ -67,8 +71,36 @@ func PubHash2Address(publicKeyHash []byte) []byte {
 	return Base58Encode(finalHash)
 }
 
+// Address2PubHash 地址转为公钥哈希
 func Address2PubHash(address []byte) []byte {
 	decodeHash := Base58Decode(address)
 	pubKeyHash := decodeHash[1 : len(decodeHash)-constcoe.ChecksumLength]
 	return pubKeyHash
+}
+
+// Sign 根据私钥对数据进行签名
+func Sign(msg []byte, privateKey ecdsa.PrivateKey) []byte {
+	r, s, err := ecdsa.Sign(rand.Reader, &privateKey, msg)
+	Handle(err)
+	signature := append(r.Bytes(), s.Bytes()...)
+	return signature
+}
+
+// Verity 验证签名
+func Verity(msg []byte, pubKey []byte, signature []byte) bool {
+	curve := elliptic.P256()
+	r := big.Int{}
+	s := big.Int{}
+	sigLen := len(signature)
+
+	r.SetBytes(signature[:sigLen/2])
+	s.SetBytes(signature[sigLen/2:])
+
+	x, y := big.Int{}, big.Int{}
+	keyLen := len(pubKey)
+	x.SetBytes(pubKey[:keyLen/2])
+	y.SetBytes(pubKey[keyLen/2:])
+
+	rawPubKey := ecdsa.PublicKey{Curve: curve, X: &x, Y: &y}
+	return ecdsa.Verify(&rawPubKey, msg, &r, &s)
 }

@@ -100,42 +100,36 @@ var spvTests = []struct {
 	findTX      []int
 	wants       []bool
 }{
-	//{
-	//	txContained: []int{0},
-	//	prevBlock:   "prev1",
-	//	findTX:      []int{0, 1},
-	//	wants:       []bool{true, false},
-	//},
+	{
+		txContained: []int{0},
+		prevBlock:   "prev1",
+		findTX:      []int{0, 1},
+		wants:       []bool{true, false},
+	},
+	{
+		txContained: []int{0, 1, 2, 3, 4, 5, 6, 7},
+		prevBlock:   "prev2",
+		findTX:      []int{3, 7, 5},
+		wants:       []bool{true, true, true},
+	},
 	{
 		txContained: []int{0, 1, 2, 3},
-		prevBlock:   "prev2",
-		findTX:      []int{3},
-		wants:       []bool{true},
+		prevBlock:   "prev3",
+		findTX:      []int{0, 1, 5},
+		wants:       []bool{true, true, false},
 	},
-	//{
-	//	txContained: []int{0, 1, 2, 3, 4, 5, 6, 7},
-	//	prevBlock:   "prev2",
-	//	findTX:      []int{3, 7, 5},
-	//	wants:       []bool{true, true, true},
-	//},
-	//{
-	//	txContained: []int{0, 1, 2, 3},
-	//	prevBlock:   "prev3",
-	//	findTX:      []int{0, 1, 5},
-	//	wants:       []bool{true, true, false},
-	//},
-	//{
-	//	txContained: []int{0, 3, 5, 6, 7},
-	//	prevBlock:   "prev4",
-	//	findTX:      []int{0, 1, 6, 7},
-	//	wants:       []bool{true, false, true, true},
-	//},
-	//{
-	//	txContained: []int{0, 1, 2, 4, 5, 6, 7},
-	//	prevBlock:   "prev5",
-	//	findTX:      []int{0, 1, 3},
-	//	wants:       []bool{true, true, false},
-	//},
+	{
+		txContained: []int{0, 3, 5, 6, 7},
+		prevBlock:   "prev4",
+		findTX:      []int{0, 1, 6, 7},
+		wants:       []bool{true, false, true, true},
+	},
+	{
+		txContained: []int{0, 1, 2, 4, 5, 6, 7},
+		prevBlock:   "prev5",
+		findTX:      []int{0, 1, 3},
+		wants:       []bool{true, true, false},
+	},
 }
 
 func TestSPV(t *testing.T) {

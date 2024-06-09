@@ -21,12 +21,12 @@ type MerkleNode struct {
 func CreateMerkleNode(left, right *MerkleNode, data []byte) *MerkleNode {
 	temp := &MerkleNode{}
 
-	if left == nil && right == nil {
-		temp.Data = data
-	} else {
+	if left != nil && right != nil {
 		tmpHash := append(left.Data, right.Data...)
 		hash := sha256.Sum256(tmpHash)
 		temp.Data = hash[:]
+	} else {
+		temp.Data = data
 	}
 
 	temp.Left = left

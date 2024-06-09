@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/gob"
+	"github.com/limitzhang87/goblockchain/merkletree"
 	"github.com/limitzhang87/goblockchain/transaction"
 	"github.com/limitzhang87/goblockchain/utils"
 	"time"
@@ -16,6 +17,7 @@ type Block struct {
 	Target       []byte
 	Nonce        int64
 	Transactions []*transaction.Transaction
+	MTree        *merkletree.MerkleTree
 }
 
 func GenesisBlock(address []byte) *Block {
@@ -33,6 +35,7 @@ func CreateBlock(prevHash []byte, txs []*transaction.Transaction) *Block {
 		Target:       []byte{},
 		Nonce:        0,
 		Transactions: txs,
+		MTree:        merkletree.CreateMerkleTree(txs),
 	}
 	block.Target = block.GetTarget()
 	block.Nonce = block.FindNonce()
@@ -56,6 +59,7 @@ func (b *Block) SetHash() {
 		b.Target,
 		utils.ToHexInt(b.Nonce),
 		b.BackTransactionSummary(),
+		b.MTree.Root.Data,
 	}, []byte{})
 	hash := sha256.Sum256(information)
 	b.Hash = hash[:]

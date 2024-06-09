@@ -60,7 +60,7 @@ func CreateMerkleTree(txs []*transaction.Transaction) *MerkleTree {
 	return &MerkleTree{Root: nodeList[0]}
 }
 
-func (mn *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte) (bool, []int, [][]byte) {
+func (mn *MerkleNode) Find2(data []byte, route []int, hashRoute [][]byte) (bool, []int, [][]byte) {
 	findFlag := false
 	if bytes.EqualFold(mn.Data, data) {
 		findFlag = true
@@ -91,12 +91,39 @@ func (mn *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte) (bool, 
 	return findFlag, route, hashRoute
 }
 
+// Find SPV算法中，返回待验证数据的路径和路径hash， 使用深度有限算法
+func (mn *MerkleNode) Find(data []byte, route []int, hashRoute [][]byte) (bool, []int, [][]byte) {
+	flag := false
+	if bytes.Equal(mn.Data, data) {
+		flag = true
+		return flag, route, hashRoute
+	}
+	if mn.Left != nil {
+		routeT := append(route, 0)                     // 路径中0， 代表当前深度有限算法中，走的是左边
+		hashRouteT := append(hashRoute, mn.Right.Data) // 放入右边的数据，为了验证，从底部往上回溯时左边的数据和这个右边的数据合并一起
+		flag, routeT, hashRouteT = mn.Left.Find2(data, routeT, hashRouteT)
+		if flag {
+			return flag, routeT, hashRouteT
+		}
+	}
+	if mn.Right != nil {
+		routeT := append(route, 1)                    // 路径中1， 代表当前深度有限算法中，走的是右边
+		hashRouteT := append(hashRoute, mn.Left.Data) // 放入左边的结点，这是为了后面验证时，
+		flag, routeT, hashRouteT = mn.Right.Find2(data, routeT, hashRouteT)
+		if flag {
+			return flag, routeT, hashRouteT
+		}
+	}
+	return flag, route, hashRoute
+}
+
 // BackValidationRoute ...
 func (mt *MerkleTree) BackValidationRoute(txId []byte) ([]int, [][]byte, bool) {
 	ok, route, hashRoute := mt.Root.Find(txId, []int{}, [][]byte{})
 	return route, hashRoute, ok
 }
 
+// SimplePaymentValidation SPV算法验算数据是否是块中数据，从下往上验算
 func SimplePaymentValidation(txId, mtRoutHash []byte, route []int, hashRoute [][]byte) bool {
 	routeLen := len(route)
 	tempHash := txId

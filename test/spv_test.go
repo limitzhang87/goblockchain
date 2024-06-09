@@ -2,6 +2,7 @@ package test
 
 import (
 	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"github.com/limitzhang87/goblockchain/blockchain"
 	"github.com/limitzhang87/goblockchain/merkletree"
@@ -155,14 +156,13 @@ func TestSPV(t *testing.T) {
 			fmt.Println("Find transaction:", findIdx)
 			fmt.Printf("Transaction ID: %x\n", primeTXs[findIdx].ID)
 			route, hashRoute, ok := testBlock.MTree.BackValidationRoute(primeTXs[findIdx].ID)
+			fmt.Println(route, changeByteToStr(hashRoute))
 			if ok {
-				fmt.Println("Validate route has been found: ", route)
 				fmt.Println("Route is like:")
 				routePaint(route)
 			} else {
 				fmt.Println("Has not found the referred transaction")
 			}
-			fmt.Println(route, hashRoute)
 			spvRes := merkletree.SimplePaymentValidation(primeTXs[findIdx].ID, testBlock.MTree.Root.Data, route, hashRoute)
 			fmt.Println("SPV result: ", spvRes, ", Want result: ", test.wants[num])
 			if spvRes != test.wants[num] {
@@ -247,4 +247,12 @@ func routePaint(route []int) {
 		fmt.Println(str1)
 		fmt.Println(str2)
 	}
+}
+
+func changeByteToStr(data [][]byte) []string {
+	l := make([]string, len(data))
+	for i, datum := range data {
+		l[i] = hex.EncodeToString(datum)
+	}
+	return l
 }
